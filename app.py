@@ -1223,6 +1223,49 @@ def main():
     """
     import os
 
+    # Load dataset
+    data_path = "data/courier_dataset.csv"
+    if not os.path.exists(data_path):
+        st.error("Dataset not found. Please run `python download_data.py` or check Git LFS.")
+        return
+    
+    try:
+        df = pd.read_csv(data_path)
+        max_rows = len(df) if not df.empty else 1  # Fallback if empty
+    except Exception as e:
+        st.error(f"Error loading dataset: {e}")
+        return
+
+    # Ensure valid max_rows
+    if max_rows < 10000:
+        st.warning(f"Dataset has only {max_rows} records, which is less than the minimum sample size (10,000). Using full dataset.")
+        sample_size = max_rows
+    else:
+        # Define slider with safe parameters
+        use_sample = st.sidebar.checkbox("Use sample data", value=True)
+        if use_sample:
+            sample_size = st.sidebar.slider(
+                label="Sample size",
+                min_value=10000,
+                max_value=max_rows,
+                value=min(50000, max_rows),
+                step=1000,
+                help=f"Select number of records to use (max: {max_rows:,})"
+            )
+        else:
+            sample_size = max_rows
+
+    # Use the sampled dataset
+    sampled_df = df.sample(n=sample_size, random_state=42) if use_sample else df
+    st.write(f"Dataset size: {sample_size} records")
+
+    # Load model
+    model_path = "models/delivery_time_model.pkl"
+    if not os.path.exists(model_path):
+        st.info("Regenerating model...")
+        os.system("python src/model_training.py")
+    model = joblib.load(model_path)
+
     # Initialize session state to prevent double loading
     if 'data_loaded' not in st.session_state:
         st.session_state.data_loaded = False
